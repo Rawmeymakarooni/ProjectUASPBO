@@ -1,7 +1,7 @@
 import java.util.ArrayList;
 import java.util.Date;
 
-class Order {
+class Order implements StrukKeluaran {
     private static int orderCounter = 1;
 
     private int orderId;
@@ -10,6 +10,7 @@ class Order {
     private String status;
     private String paymentMethod;
     private double paymentAmount;
+
 
     // Inner Class
     class OrderItem {
@@ -100,6 +101,7 @@ class Order {
         return amount - total; // Change
     }
 
+    @Override
     public String getReceipt() {
         StringBuilder receipt = new StringBuilder();
         receipt.append("\n╔════════════════════════════════════╗\n");
