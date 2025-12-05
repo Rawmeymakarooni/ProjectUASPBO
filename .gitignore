@@ -1,0 +1,12 @@
+/out/
+*.class
+pos.db
+*.jar
+# IntelliJ
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
