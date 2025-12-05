@@ -64,7 +64,7 @@ public class CreatePosDbSchema {
                         if (!menuExists) {
                             // Create fresh menu_items with item_id primary key
                             stmt.executeUpdate("CREATE TABLE menu_items ("
-                                    + "item_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                                    + "item_id INTEGER PRIMARY KEY,"
                                     + "name TEXT NOT NULL,"
                                     + "category TEXT,"
                                     + "price REAL NOT NULL DEFAULT 0,"
@@ -73,7 +73,7 @@ public class CreatePosDbSchema {
                         } else if (needsMigration) {
                             // Migrate old menu_items(id, ...) -> menu_items(item_id, ...)
                             stmt.executeUpdate("CREATE TABLE menu_items_new ("
-                                    + "item_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                                    + "item_id INTEGER PRIMARY KEY,"
                                     + "name TEXT NOT NULL,"
                                     + "category TEXT,"
                                     + "price REAL NOT NULL DEFAULT 0,"
@@ -98,7 +98,7 @@ public class CreatePosDbSchema {
                                 if (!hasItemId) {
                                     // If no item_id, but menu exists without id (unlikely), create new table and copy
                                     stmt.executeUpdate("CREATE TABLE menu_items_new ("
-                                            + "item_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                                            + "item_id INTEGER PRIMARY KEY,"
                                             + "name TEXT NOT NULL,"
                                             + "category TEXT,"
                                             + "price REAL NOT NULL DEFAULT 0,"
@@ -116,7 +116,52 @@ public class CreatePosDbSchema {
                         stmt.executeUpdate("DROP TABLE IF EXISTS order_items");
                         stmt.executeUpdate("DROP TABLE IF EXISTS orders");
 
-                        // Re-enable foreign keys
+                        // Re-enable foreign keys (but we may temporarily toggle it during migration)
+                        // We'll check if menu_items currently contains AUTOINCREMENT in its DDL;
+                        // if so, recreate menu_items without AUTOINCREMENT while preserving data.
+
+                        // Temporarily turn off foreign keys for safe migration
+                        stmt.executeUpdate("PRAGMA foreign_keys = OFF");
+
+                        String menuDdl = null;
+                        try (ResultSet rd = stmt.executeQuery("SELECT sql FROM sqlite_master WHERE type='table' AND name='menu_items'")) {
+                            if (rd.next()) menuDdl = rd.getString(1);
+                        }
+
+                        if (menuDdl != null && menuDdl.toUpperCase().contains("AUTOINCREMENT")) {
+                            // Migrate: create new table without AUTOINCREMENT, copy data, swap
+                            System.out.println("Detected AUTOINCREMENT on menu_items — migrating to remove it...");
+                            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS menu_items_new ("
+                                    + "item_id INTEGER PRIMARY KEY,"
+                                    + "name TEXT NOT NULL,"
+                                    + "category TEXT,"
+                                    + "price REAL NOT NULL DEFAULT 0,"
+                                    + "stock INTEGER NOT NULL DEFAULT 0"
+                                    + ")");
+
+                            // Copy existing data (preserve item_id values)
+                            stmt.executeUpdate("INSERT OR IGNORE INTO menu_items_new(item_id, name, category, price, stock) SELECT item_id, name, category, price, stock FROM menu_items");
+
+                            // Swap tables
+                            stmt.executeUpdate("ALTER TABLE menu_items RENAME TO menu_items_old");
+                            stmt.executeUpdate("ALTER TABLE menu_items_new RENAME TO menu_items");
+                            stmt.executeUpdate("DROP TABLE IF EXISTS menu_items_old");
+
+                            // Remove sqlite_sequence entry for menu_items if exists
+                            try (ResultSet rseq = stmt.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='sqlite_sequence'")) {
+                                if (rseq.next()) {
+                                    try {
+                                        stmt.executeUpdate("DELETE FROM sqlite_sequence WHERE name='menu_items'");
+                                    } catch (SQLException ignore) {
+                                        // ignore if sqlite_sequence doesn't exist or permission issue
+                                    }
+                                }
+                            }
+
+                            System.out.println("Migration complete: menu_items recreated without AUTOINCREMENT.");
+                        }
+
+                        // Re-enable foreign keys now that structure is consistent
                         stmt.executeUpdate("PRAGMA foreign_keys = ON");
 
                         // Ensure purchases table exists (single-table history, no autoincrement id)
