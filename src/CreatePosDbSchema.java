@@ -35,43 +35,99 @@ public class CreatePosDbSchema {
                     try (Statement stmt = conn.createStatement()) {
                         conn.setAutoCommit(false);
 
-                        // Create menu_items table
-                        stmt.executeUpdate("CREATE TABLE IF NOT EXISTS menu_items ("
-                                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                                + "name TEXT NOT NULL,"
-                                + "category TEXT,"
-                                + "price REAL NOT NULL DEFAULT 0,"
-                                + "stock INTEGER NOT NULL DEFAULT 0"
-                                + ")");
+                        // Create menu_items table (new schema uses item_id as primary key)
+                        stmt.executeUpdate("PRAGMA foreign_keys = OFF");
 
-                        // Create orders table
-                        stmt.executeUpdate("CREATE TABLE IF NOT EXISTS orders ("
-                                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                                + "timestamp TEXT NOT NULL DEFAULT (datetime('now')),"
-                                + "status TEXT NOT NULL DEFAULT 'Pending',"
-                                + "payment_method TEXT,"
-                                + "payment_amount REAL DEFAULT 0"
-                                + ")");
+                        // Check if menu_items exists and inspect columns
+                        boolean menuExists = false;
+                        try (ResultSet rt = stmt.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='menu_items'")) {
+                            menuExists = rt.next();
+                        }
 
-                        // Create order_items table
-                        stmt.executeUpdate("CREATE TABLE IF NOT EXISTS order_items ("
-                                + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                                + "order_id INTEGER NOT NULL,"
-                                + "menu_item_id INTEGER NOT NULL,"
-                                + "quantity INTEGER NOT NULL DEFAULT 1,"
-                                + "subtotal REAL NOT NULL DEFAULT 0,"
-                                + "FOREIGN KEY(order_id) REFERENCES orders(id),"
-                                + "FOREIGN KEY(menu_item_id) REFERENCES menu_items(id)"
-                                + ")");
+                        boolean needsMigration = false;
+                        if (menuExists) {
+                            try (ResultSet cols = stmt.executeQuery("PRAGMA table_info(menu_items)")) {
+                                boolean hasItemId = false;
+                                boolean hasId = false;
+                                while (cols.next()) {
+                                    String colName = cols.getString("name");
+                                    if ("item_id".equalsIgnoreCase(colName)) hasItemId = true;
+                                    if ("id".equalsIgnoreCase(colName)) hasId = true;
+                                }
+                                if (!hasItemId) {
+                                    // If old column 'id' exists, we'll migrate; otherwise create new table.
+                                    needsMigration = hasId;
+                                }
+                            }
+                        }
 
-                        // Create purchase_history table (single table history, no autoincrement id)
-                        stmt.executeUpdate("CREATE TABLE IF NOT EXISTS purchase_history ("
+                        if (!menuExists) {
+                            // Create fresh menu_items with item_id primary key
+                            stmt.executeUpdate("CREATE TABLE menu_items ("
+                                    + "item_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                                    + "name TEXT NOT NULL,"
+                                    + "category TEXT,"
+                                    + "price REAL NOT NULL DEFAULT 0,"
+                                    + "stock INTEGER NOT NULL DEFAULT 0"
+                                    + ")");
+                        } else if (needsMigration) {
+                            // Migrate old menu_items(id, ...) -> menu_items(item_id, ...)
+                            stmt.executeUpdate("CREATE TABLE menu_items_new ("
+                                    + "item_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                                    + "name TEXT NOT NULL,"
+                                    + "category TEXT,"
+                                    + "price REAL NOT NULL DEFAULT 0,"
+                                    + "stock INTEGER NOT NULL DEFAULT 0"
+                                    + ")");
+
+                            // Copy data: preserve old id values into item_id
+                            stmt.executeUpdate("INSERT INTO menu_items_new(item_id, name, category, price, stock) SELECT id, name, category, price, stock FROM menu_items");
+
+                            // Rename old and replace
+                            stmt.executeUpdate("ALTER TABLE menu_items RENAME TO menu_items_old");
+                            stmt.executeUpdate("ALTER TABLE menu_items_new RENAME TO menu_items");
+                            // Drop old
+                            stmt.executeUpdate("DROP TABLE IF EXISTS menu_items_old");
+                        } else {
+                            // menu exists and already has item_id or no id to migrate; ensure new column exists
+                            try (ResultSet cols = stmt.executeQuery("PRAGMA table_info(menu_items)")) {
+                                boolean hasItemId = false;
+                                while (cols.next()) {
+                                    if ("item_id".equalsIgnoreCase(cols.getString("name"))) hasItemId = true;
+                                }
+                                if (!hasItemId) {
+                                    // If no item_id, but menu exists without id (unlikely), create new table and copy
+                                    stmt.executeUpdate("CREATE TABLE menu_items_new ("
+                                            + "item_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                                            + "name TEXT NOT NULL,"
+                                            + "category TEXT,"
+                                            + "price REAL NOT NULL DEFAULT 0,"
+                                            + "stock INTEGER NOT NULL DEFAULT 0"
+                                            + ")");
+                                    stmt.executeUpdate("INSERT INTO menu_items_new(name, category, price, stock) SELECT name, category, price, stock FROM menu_items");
+                                    stmt.executeUpdate("ALTER TABLE menu_items RENAME TO menu_items_old");
+                                    stmt.executeUpdate("ALTER TABLE menu_items_new RENAME TO menu_items");
+                                    stmt.executeUpdate("DROP TABLE IF EXISTS menu_items_old");
+                                }
+                            }
+                        }
+
+                        // Drop legacy orders/order_items tables if present — we now use purchase_history only
+                        stmt.executeUpdate("DROP TABLE IF EXISTS order_items");
+                        stmt.executeUpdate("DROP TABLE IF EXISTS orders");
+
+                        // Re-enable foreign keys
+                        stmt.executeUpdate("PRAGMA foreign_keys = ON");
+
+                        // Ensure purchases table exists (single-table history, no autoincrement id)
+                        stmt.executeUpdate("CREATE TABLE IF NOT EXISTS purchases ("
                                 + "purchase_id INTEGER NOT NULL,"
                                 + "item_id INTEGER,"
                                 + "quantity INTEGER NOT NULL DEFAULT 1,"
                                 + "total_price REAL NOT NULL DEFAULT 0,"
                                 + "modifier TEXT,"
                                 + "timestamp TEXT NOT NULL DEFAULT (datetime('now'))"
+                                + " , FOREIGN KEY(item_id) REFERENCES menu_items(item_id)"
                                 + ")");
 
                         // Prepare menu items from POSRestaurant.initializeMenu()
@@ -91,7 +147,7 @@ public class CreatePosDbSchema {
                         };
 
                         // Insert menu items if they do not exist
-                        try (PreparedStatement psSelect = conn.prepareStatement("SELECT id FROM menu_items WHERE name = ?");
+                        try (PreparedStatement psSelect = conn.prepareStatement("SELECT item_id FROM menu_items WHERE name = ?");
                              PreparedStatement psInsert = conn.prepareStatement("INSERT INTO menu_items(name, category, price, stock) VALUES(?,?,?,?)")) {
                             for (String[] row : menu) {
                                 String name = row[0];
@@ -115,11 +171,11 @@ public class CreatePosDbSchema {
                         conn.commit();
 
                         // Print inserted menu items for verification and show tables including purchase_history
-                        try (ResultSet rs = stmt.executeQuery("SELECT id, name, category, price, stock FROM menu_items ORDER BY id")) {
+                        try (ResultSet rs = stmt.executeQuery("SELECT item_id, name, category, price, stock FROM menu_items ORDER BY item_id")) {
                             System.out.println("menu_items in database:");
                             while (rs.next()) {
                                 System.out.printf("%d | %s | %s | Rp %,.0f | stock=%d%n",
-                                        rs.getInt("id"), rs.getString("name"), rs.getString("category"), rs.getDouble("price"), rs.getInt("stock"));
+                                        rs.getInt("item_id"), rs.getString("name"), rs.getString("category"), rs.getDouble("price"), rs.getInt("stock"));
                             }
                         }
 
