@@ -1,6 +1,4 @@
 abstract class MenuItem {
-    private static int idCounter = 1;
-
     private int id;
     private String name;
     private double price;
@@ -8,11 +6,15 @@ abstract class MenuItem {
     private String category;
 
     public MenuItem(String name, double price, int stock, String category) {
-        this.id = idCounter++;
         this.name = name;
         this.price = price;
         this.stock = stock;
         this.category = category;
+    }
+
+    // Setter for ID (used when loading from database)
+    public void setId(int id) {
+        this.id = id;
     }
 
     // Abstract method (must be implemented by children)

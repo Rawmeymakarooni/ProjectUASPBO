@@ -3,12 +3,12 @@ import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.*;
-import java.text.SimpleDateFormat;
 
 public class POSRestaurant extends JFrame {
     private ArrayList<MenuItem> menu;
     private Order currentOrder;
     private ArrayList<Order> completedOrders;
+    private DatabaseManager dbManager;
 
     // GUI Components
     private JTabbedPane tabbedPane;
@@ -25,32 +25,32 @@ public class POSRestaurant extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // Initialize data
-        menu = new ArrayList<>();
+        // Initialize database
+        dbManager = DatabaseManager.getInstance();
+        dbManager.initializeDatabase();
+        dbManager.seedMenuItems();
+
+        // Initialize data from database
+        menu = dbManager.loadMenuItems();
         currentOrder = new Order();
-        completedOrders = new ArrayList<>();
-        initializeMenu();
+        completedOrders = dbManager.loadCompletedOrders(menu);
 
         // Create GUI
         createGUI();
 
+        // Add shutdown hook to close database
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                dbManager.close();
+            }
+        });
+
         setVisible(true);
     }
 
-    private void initializeMenu() {
-        menu.add(new Food("Nasi Goreng", 25000, 50, 2));
-        menu.add(new Food("Rendang", 35000, 30, 3));
-        menu.add(new Food("Ayam Geprek", 20000, 40, 5));
-        menu.add(new Food("Soto Ayam", 18000, 35, 1));
-        menu.add(new Food("Mie Goreng", 22000, 45, 2));
-        menu.add(new Beverage("Es Teh Manis", 5000, 100, false));
-        menu.add(new Beverage("Kopi Hitam", 8000, 80, true));
-        menu.add(new Beverage("Jus Alpukat", 15000, 40, false));
-        menu.add(new Beverage("Teh Hangat", 5000, 100, true));
-        menu.add(new Dessert("Es Krim", 12000, 50, true));
-        menu.add(new Dessert("Pudding", 10000, 40, false));
-        menu.add(new Dessert("Pisang Goreng", 8000, 60, false));
-    }
+    // Menu is now loaded from database - this method is no longer needed
+    // Keeping for reference only
 
     private void createGUI() {
         tabbedPane = new JTabbedPane();
@@ -82,7 +82,7 @@ public class POSRestaurant extends JFrame {
         menuList.setCellRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value, int index,
-                                                          boolean isSelected, boolean cellHasFocus) {
+                    boolean isSelected, boolean cellHasFocus) {
                 super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
                 if (value instanceof MenuItem) {
                     MenuItem item = (MenuItem) value;
@@ -112,7 +112,7 @@ public class POSRestaurant extends JFrame {
         cartPanel.setBorder(BorderFactory.createTitledBorder("Shopping Cart"));
 
         // Cart Table
-        String[] columns = {"Item", "Price", "Qty", "Subtotal"};
+        String[] columns = { "Item", "Price", "Qty", "Subtotal" };
         cartTableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -149,7 +149,7 @@ public class POSRestaurant extends JFrame {
         grandTotalLabel = new JLabel("Rp 0");
         grandTotalLabel.setFont(new Font("Arial", Font.BOLD, 16));
 
-        paymentMethodCombo = new JComboBox<>(new String[]{"Cash", "Debit Card", "E-Wallet"});
+        paymentMethodCombo = new JComboBox<>(new String[] { "Cash", "Debit Card", "E-Wallet" });
         paymentField = new JTextField();
 
         paymentPanel.add(new JLabel("Subtotal:"));
@@ -187,7 +187,7 @@ public class POSRestaurant extends JFrame {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        String[] columns = {"ID", "Name", "Category", "Price", "Stock", "Action"};
+        String[] columns = { "ID", "Name", "Category", "Price", "Stock", "Action" };
         DefaultTableModel stockModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -214,6 +214,7 @@ public class POSRestaurant extends JFrame {
                         MenuItem item = menu.stream().filter(m -> m.getId() == id).findFirst().orElse(null);
                         if (item != null) {
                             item.addStock(qty);
+                            dbManager.updateStock(item.getId(), item.getStock()); // Save to database
                             updateStockTable(stockModel);
                             updateMenuList();
                             JOptionPane.showMessageDialog(this, "Stock updated successfully!");
@@ -243,7 +244,8 @@ public class POSRestaurant extends JFrame {
         JPanel statsPanel = new JPanel(new GridLayout(1, 3, 10, 10));
 
         JPanel ordersPanel = createStatPanel("Total Orders", String.valueOf(completedOrders.size()), Color.BLUE);
-        JPanel salesPanel = createStatPanel("Total Sales", "Rp " + String.format("%,.0f", getTotalSales()), Color.GREEN);
+        JPanel salesPanel = createStatPanel("Total Sales", "Rp " + String.format("%,.0f", getTotalSales()),
+                Color.GREEN);
         JPanel avgPanel = createStatPanel("Avg Order", "Rp " + String.format("%,.0f", getAverageOrder()), Color.ORANGE);
 
         statsPanel.add(ordersPanel);
@@ -270,7 +272,8 @@ public class POSRestaurant extends JFrame {
             ordersPanel.removeAll();
             ordersPanel.add(createStatPanel("Total Orders", String.valueOf(completedOrders.size()), Color.BLUE));
             salesPanel.removeAll();
-            salesPanel.add(createStatPanel("Total Sales", "Rp " + String.format("%,.0f", getTotalSales()), Color.GREEN));
+            salesPanel
+                    .add(createStatPanel("Total Sales", "Rp " + String.format("%,.0f", getTotalSales()), Color.GREEN));
             avgPanel.removeAll();
             avgPanel.add(createStatPanel("Avg Order", "Rp " + String.format("%,.0f", getAverageOrder()), Color.ORANGE));
             updateBestSellers(bestSellersModel);
@@ -386,8 +389,17 @@ public class POSRestaurant extends JFrame {
                     String.format("Payment successful!\nChange: Rp %,.0f", change),
                     "Success", JOptionPane.INFORMATION_MESSAGE);
 
-            // Save order
+            // Save order to database
+            int savedOrderId = dbManager.saveOrder(currentOrder);
+            if (savedOrderId > 0) {
+                currentOrder.setOrderId(savedOrderId);
+            }
             completedOrders.add(currentOrder);
+
+            // Update stock in database for all items
+            for (Order.OrderItem orderItem : currentOrder.getItems()) {
+                dbManager.updateStock(orderItem.getMenuItem().getId(), orderItem.getMenuItem().getStock());
+            }
 
             // Reset
             currentOrder = new Order();
@@ -433,7 +445,8 @@ public class POSRestaurant extends JFrame {
     }
 
     private double getAverageOrder() {
-        if (completedOrders.isEmpty()) return 0;
+        if (completedOrders.isEmpty())
+            return 0;
         return getTotalSales() / completedOrders.size();
     }
 
@@ -451,9 +464,7 @@ public class POSRestaurant extends JFrame {
         sales.entrySet().stream()
                 .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
                 .limit(5)
-                .forEach(entry ->
-                        model.addElement(entry.getKey() + " - " + entry.getValue() + " sold")
-                );
+                .forEach(entry -> model.addElement(entry.getKey() + " - " + entry.getValue() + " sold"));
 
         if (model.isEmpty()) {
             model.addElement("No sales data yet");

@@ -1,16 +1,13 @@
 import java.util.ArrayList;
 import java.util.Date;
 
-class Order implements StrukKeluaran {
-    private static int orderCounter = 1;
-
+class Order {
     private int orderId;
     private ArrayList<OrderItem> items;
     private Date timestamp;
     private String status;
     private String paymentMethod;
     private double paymentAmount;
-
 
     // Inner Class
     class OrderItem {
@@ -32,7 +29,6 @@ class Order implements StrukKeluaran {
     }
 
     public Order() {
-        this.orderId = orderCounter++;
         this.items = new ArrayList<>();
         this.timestamp = new Date();
         this.status = "Pending";
@@ -101,7 +97,6 @@ class Order implements StrukKeluaran {
         return amount - total; // Change
     }
 
-    @Override
     public String getReceipt() {
         StringBuilder receipt = new StringBuilder();
         receipt.append("\n╔════════════════════════════════════╗\n");
@@ -138,4 +133,17 @@ class Order implements StrukKeluaran {
     public int getOrderId() { return orderId; }
     public Date getTimestamp() { return timestamp; }
     public String getStatus() { return status; }
+    public String getPaymentMethod() { return paymentMethod; }
+    public double getPaymentAmount() { return paymentAmount; }
+
+    // Setters for loading from database
+    public void setOrderId(int orderId) { this.orderId = orderId; }
+    public void setStatus(String status) { this.status = status; }
+    public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+    public void setPaymentAmount(double paymentAmount) { this.paymentAmount = paymentAmount; }
+
+    // Add item without checking for duplicates (for loading from database)
+    public void addItemForLoading(MenuItem menuItem, int quantity) {
+        items.add(new OrderItem(menuItem, quantity));
+    }
 }
