@@ -290,6 +290,25 @@ public static synchronized DatabaseManager getInstance() {
 ## 📸 Screenshots
 
 ### Tampilan Kasir
+```
+┌─────────────────────────────────────────────────────────────┐
+│  🍽️ Warung Padang POS System                                │
+├─────────────────────────────────────────────────────────────┤
+│  [💰 Cashier] [📦 Stock] [📊 Sales]                          │
+├──────────────────────────┬──────────────────────────────────┤
+│  📋 Menu Items           │  🛒 Shopping Cart                │
+│  ──────────────────────  │  ──────────────────────────────  │
+│  🍽️ Nasi Goreng  Rp25k   │  Item    Price    Qty   Subtotal │
+│  🍽️ Rendang      Rp35k   │  ────────────────────────────    │
+│  🍽️ Ayam Geprek  Rp20k   │  Nasi Goreng  25k   2    50k    │
+│  ☕ Kopi Hitam   Rp8k    │                                  │
+│  🧊 Es Teh       Rp5k    │  Subtotal:        Rp 50,000      │
+│                          │  Tax (10%):       Rp  5,000      │
+│  [Add to Cart]           │  GRAND TOTAL:     Rp 55,000      │
+│                          │                                  │
+│                          │  [💳 Process Payment]            │
+└──────────────────────────┴──────────────────────────────────┘
+```
 
 ### Contoh Struk
 ```
@@ -333,6 +352,25 @@ Change:                       Rp 39,500
 | 10 | Es Krim | Rp 12.000 | Dessert | 🍨 |
 | 11 | Pudding | Rp 10.000 | Dessert | 🍰 |
 | 12 | Pisang Goreng | Rp 8.000 | Dessert | 🍰 |
+
+---
+
+## 🤝 Kontribusi
+
+Jika ingin berkontribusi:
+1. Fork repository ini
+2. Buat branch baru (`git checkout -b feature/fitur-baru`)
+3. Commit perubahan (`git commit -m 'Menambah fitur baru'`)
+4. Push ke branch (`git push origin feature/fitur-baru`)
+5. Buat Pull Request
+
+---
+
+## 📄 Lisensi
+
+Project ini dilisensikan di bawah MIT License.
+
+---
 
 <p align="center">
   Made with ❤️ using Java Swing & SQLite
