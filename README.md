@@ -1,4 +1,4 @@
-# 🍽️ CekTipis - Warung Padang POS System
+# 🍽️ CekTipis - Warung Makan POS System
 
 Aplikasi Point of Sale (POS) berbasis Java Swing untuk manajemen restoran/warung dengan fitur kasir, manajemen stok, dan laporan penjualan.
 
@@ -355,14 +355,13 @@ Change:                       Rp 39,500
 
 ---
 
-## 🤝 Kontribusi
+## 🤝 Kontributor:
+* Isma'il Faruqy 092
+* Alysha Ananda Shafa 087
+* Astrella Syadira Ramadhante 094
+* Rizqullah Ramadhan Anandamulti 075
+* Yohanes Andhika Bintang Pramadya 068
 
-Jika ingin berkontribusi:
-1. Fork repository ini
-2. Buat branch baru (`git checkout -b feature/fitur-baru`)
-3. Commit perubahan (`git commit -m 'Menambah fitur baru'`)
-4. Push ke branch (`git push origin feature/fitur-baru`)
-5. Buat Pull Request
 
 ---
 
