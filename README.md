@@ -2,7 +2,7 @@
 
 Aplikasi Point of Sale (POS) berbasis Java Swing untuk manajemen restoran/warung dengan fitur kasir, manajemen stok, dan laporan penjualan.
 
-![Java](https://img.shields.io/badge/Java-17+-orange?style=flat-square&logo=openjdk)
+![Java](https://img.shields.io/badge/Java-25-orange?style=flat-square&logo=openjdk)
 ![SQLite](https://img.shields.io/badge/SQLite-3.36-blue?style=flat-square&logo=sqlite)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
