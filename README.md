@@ -51,7 +51,7 @@ Aplikasi Point of Sale (POS) berbasis Java Swing untuk manajemen restoran/warung
 
 | Komponen | Teknologi |
 |----------|-----------|
-| Bahasa | Java 17+ |
+| Bahasa | Java 25 |
 | GUI Framework | Java Swing |
 | Database | SQLite 3.36 |
 | JDBC Driver | sqlite-jdbc-3.36.0.3.jar |
